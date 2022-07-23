@@ -1,35 +1,20 @@
-version: "3.7"
+version: '3'
+
 services:
-  app:
-    build:
-      args:
-        user: matheusbrdev
-        uid: 1000
-      context: ./
-      dockerfile: Dockerfile
-    image: matheusbrdev/php-7.3
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    container_name: name-app
-    restart: unless-stopped
-    working_dir: /var/www/
+  cteste-app:
+    image: local/container-php:latest
+    hostname: cteste-app
+    container_name: cteste-app
+    restart: always
     volumes:
-      - ./:/var/www
-    networks:
-      - nameNetwork
+      - ./:/var/www/html/
 
-  nginx:
-    image: nginx:alpine
-    container_name: name-server
-    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     ports:
-      - 80:80
-    volumes:
-      - ./:/var/www
-      - ./docker-compose/nginx:/etc/nginx/conf.d/
-    networks:
-      - nameNetwork
-
-networks:
-  nameNetwork:
-    driver: bridge
+      - 8080:80
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"

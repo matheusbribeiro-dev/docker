@@ -1,11 +1,9 @@
-FROM php:7.3-fpm-bullseye
-# Arguments defined in docker-compose.yml
-ARG user
-ARG uid
+FROM php:8.1.7-apache-bullseye
 
 ENV ACCEPT_EULA=Y
 
-# Install system dependencies
+RUN a2enmod ssl \
+    && a2enmod rewrite
 RUN apt-get update && apt-get install -y \
     apt-transport-https \
     gnupg2 \
@@ -14,49 +12,36 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
-    libfreetype6-dev \
-    libmcrypt-dev \
-    libjpeg-dev \
     zip \
-    unzip \
     nodejs \
-    npm
-
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath iconv soap \
-&& docker-php-ext-configure gd \
-        --with-freetype-dir=/usr/include/freetype2 \
-        --with-png-dir=/usr/include \
-        --with-jpeg-dir=/usr/include \
-     && docker-php-ext-install gd
-
+    npm \
+    bzr \
+    cvs \
+    subversion \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+#Instalando php Composer
+RUN wget -O composer-setup.php https://getcomposer.org/installer \
+    && php composer-setup.php --install-dir=/usr/local/bin --filename=composer \
+    && chmod +x /usr/local/bin/composer
 # Install prerequisites for the sqlsrv and pdo_sqlsrv PHP extensions.
 RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
     && curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
     && apt-get install -y msodbcsql17 mssql-tools unixodbc-dev \
     && rm -rf /var/lib/apt/lists/*
-
+# Install PHP extensions
+RUN docker-php-ext-install mbstring exif pcntl bcmath gd \
+    && rm -rf /var/lib/apt/lists/*
+	
 # Retrieve the script used to install PHP extensions from the source container.
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/bin/install-php-extensions
-
-# Install required PHP extensions and all their prerequisites available via apt.
+# Habilita no PHP.ini. PHP extensions and all their prerequisites available via apt.
 RUN chmod uga+x /usr/bin/install-php-extensions \
     && sync \
-    && install-php-extensions bcmath ds exif gd intl opcache pcntl pdo_sqlsrv redis sqlsrv zip
+    && install-php-extensions bcmath ds exif gd intl opcache pcntl pdo_sqlsrv redis sqlsrv zip \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /var/www/html/
 
-# Get latest Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Create system user to run Composer and Artisan Commands
-RUN useradd -G www-data,root -u $uid -d /home/$user $user
-RUN mkdir -p /home/$user/.composer && \
-    chown -R $user:$user /home/$user
-
-# Set working directory
-WORKDIR /var/www
-
-USER $user
+EXPOSE 80
+CMD ["apachectl", "-D", "FOREGROUND"]
